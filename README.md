@@ -27,4 +27,4 @@ There is a lot of potential to customize the home screen further. It looks possi
 ## Contribute
 Code contributions are welcome, as well as bitcoin donations:
 bc1qnpvc8yp7tprewaam4v64ga8v0rhnyt67532tk5
-
+![Bitcoin](https://i.imgur.com/Ixe1at6.jpg)
