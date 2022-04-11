@@ -1,0 +1,140 @@
+#!/bin/bash
+# WAR - WebOS Ad Removal (Version 1.00)
+# WARNING! This script is provided with no warranty, use at your own risk. 
+# I have done the best I can to ensure the changes are safe and that they are not permanent.
+# To neutralize this script, simply remove the USB and reboot the TV.
+# If you want this script to autorun on boot, place it in rootmytv user startup hook directory: /var/lib/webosbrew/init.d/
+set -e
+
+############ Begin User Customizable ENV Variables
+# Set WAR_ENABLED=false to disable this script.
+WAR_ENABLED=true
+# Modify WAR_USB_LOCATION to point to the mount point for your USB. If you have no other USB storage devices plugged in then leave the default setting.
+WAR_USB_LOCATION='/tmp/usb/sda/sda1'
+############ END User Customizable ENV Variables. Advanced users only past this point.
+
+# This is the directory we will mount override files from.
+WAR_WORKDIR="$WAR_USB_LOCATION/webos_ad_removal"
+
+# These are the source files that we will copy and modify.
+WAR_AI_BOARD_SOURCE="/usr/palm/applications/com.webos.app.home/qml/UserInterfaceLayer/Containers/Main/AIBoard.qml"
+WAR_RECOMMENDED_SOURCE="/usr/palm/applications/com.webos.app.home/qml/UserInterfaceLayer/Containers/Main/Recommended.qml"
+
+check_war_enabled() {
+    # This can be used to disable the script while keeping it in place. Set WAR_ENABLED to false in the env variables above.
+    if [ $WAR_ENABLED = false ]; then
+        echo "WAR_ENABLED set to false, exiting."
+        exit 1
+    fi
+}
+
+check_target_sums() {
+    # We check sha512 sum of target files before proceeding. We will be inserting a line of code at a specific line, we do this to ensure
+    # there are no unexpected results. Old versions of WebOS or updates may cause files to change, which will break this script.
+    case $1 in
+    "ai_board")
+        WAR_AI_BOARD_SUM="986fb371dd6a8edf5a5fa8479076011c2ad0375533c8aed997cf2d50254737d34b524732d745eafff5294c37bbf5b16d57c5f03b88d547d81eb0c18beb9d01e5  /usr/palm/applications/com.webos.app.home/qml/UserInterfaceLayer/Containers/Main/AIBoard.qml"
+        WAR_AI_BOARD_CHECK=$(sha512sum $WAR_AI_BOARD_SOURCE)
+
+        if [ "$WAR_AI_BOARD_SUM" != "$WAR_AI_BOARD_CHECK" ]; then
+            echo "Shasum did not match for AIBoard.qml! Script will not proceed!"
+            exit 1
+        fi
+        echo "Checksum matched!"
+        ;;
+    "recommended")
+        WAR_RECOMMENDED_SUM="1f41b67dc3603908c3aece24c9eae6798684f92cbc89ebd4594e0d786a90dddd9aa0c1c84b9a6142f07deb955dbbd5afbe1c6fef6ca29618267caa0920872e16  /usr/palm/applications/com.webos.app.home/qml/UserInterfaceLayer/Containers/Main/Recommended.qml"
+        WAR_RECOMMENDED_CHECK=$(sha512sum $WAR_RECOMMENDED_SOURCE)
+
+        if [ "$WAR_RECOMMENDED_SUM" != "$WAR_RECOMMENDED_CHECK" ]; then
+            echo "Shasum did not match for Recommended.qml! Script will not proceed!"
+            exit 1
+        fi
+        echo "Checksum matched!"
+        ;;
+    *)
+        echo "Attempted to check sum with unrecognized argument! Exiting."
+        exit 1
+        ;;
+    esac
+}
+
+check_for_usb() {
+    # We check to make sure the USB is mounted.
+    # When you plug in a USB storage device webOS will ask you to format it (if it is not NTFS) and then it will automount.
+    # This is the procedure we are using to format and mount our storage device.
+    # If you have a problem then make sure your device is properly formatted or modify $WAR_USB_LOCATION
+    # Note: This could be done a little better to make sure we are using the right USB storage device.
+    WAR_CHECK_USB=$(cat /proc/mounts | grep $WAR_USB_LOCATION)
+    if [ -z "$WAR_CHECK_USB" ]; then
+        echo "USB not detected."
+        exit 1
+    fi
+    echo "USB Found. Creating WAR work directory if it does not exist."
+    mkdir -p $WAR_WORKDIR
+}
+
+create_ai_board_override() {
+    # This runs if the modified file is not found.
+    # First we do a checksum.
+    check_target_sums "ai_board"
+
+    # Then we copy the AIBoard.qml file to our workdir.
+    cp $WAR_AI_BOARD_SOURCE "$WAR_WORKDIR/AIBoard.qml"
+
+    # Finally we modify the file.
+    sed -i '17 i return' "$WAR_WORKDIR/AIBoard.qml"
+}
+
+remove_ai_board() {
+    # First we check if the AIBoard.qml file exists on the USB. If it does not we create it.
+    if [ ! -f "$WAR_WORKDIR/AIBoard.qml" ]; then
+        echo "AIBoard override file did not exist on USB. Creating one now."
+        create_ai_board_override
+    else
+        echo "AIBoard override file found at $WAR_WORKDIR/AIBoard.qml"
+    fi
+
+    # Then we mount --bind the AIBoard.qml override file. This is a non destructive action that can be reset with a reboot or umount.
+    mount --bind "$WAR_WORKDIR/AIBoard.qml" "$WAR_AI_BOARD_SOURCE"
+}
+
+create_recommended_override() {
+    # This runs if the modified file is not found.
+    # First we do a checksum.
+    check_target_sums "recommended"
+
+    # Then we copy the Recommended.qml file to our workdir.
+    cp $WAR_AI_BOARD_SOURCE "$WAR_WORKDIR/Recommended.qml"
+
+    # Finally we modify the file.
+    sed -i '17 i return' "$WAR_WORKDIR/Recommended.qml"
+}
+
+remove_recommended() {
+    # First we check if the Recommended.qml file exists on the USB.
+    if [ ! -f "$WAR_WORKDIR/Recommended.qml" ]; then
+        echo "Recommended override file did not exist on USB. Creating one now."
+        create_recommended_override
+    else
+        echo "Recommended override file found at $WAR_WORKDIR/Recommended.qml"
+    fi
+
+    # Then we mount --bind the Recommended.qml override file. This is a non destructive action that can be reset with a reboot or umount.
+    mount --bind "$WAR_WORKDIR/Recommended.qml" "$WAR_RECOMMENDED_SOURCE"
+}
+
+init() {
+    # Make sure WAR_ENABLED is not set to false
+    check_war_enabled
+    # This is the entrypoint for the script.
+    check_for_usb
+    # Optional. This removes the AI Board (Top bar with 3 boxes. Includes ad, hero banner)
+    remove_ai_board
+    # Optional. This removes the trending section
+    remove_recommended
+    # When we are done we kill webOS home. This forces it to restart and use our changes.
+    pkill -f com.webos.app.home
+}
+
+init
