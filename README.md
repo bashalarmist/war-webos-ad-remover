@@ -23,3 +23,8 @@ Let me know if it works on your device.
 
 ## Further Notes
 There is a lot of potential to customize the home screen further. It looks possible to set back ground images, change colors, and more. 
+
+## Contribute
+Code contributions are welcome, as well as bitcoin donations:
+bc1qnpvc8yp7tprewaam4v64ga8v0rhnyt67532tk5
+
