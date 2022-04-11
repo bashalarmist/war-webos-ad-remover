@@ -18,7 +18,7 @@ Let me know if it works on your device.
 2. Setup SSH access using instructions provided by the rootmytv project. I recommend setting up SSH key access.
 3. Plug in a USB storage device. I formatted mine with NTFS via the prompt on the television. This will likely work on a preformatted NTFS drive.
 4. Copy war-webos-ad-remover from this repo onto your USB stick.
-5. SSH into your TV. Execute this script (should be located at `/tmp/usb/sda/sda1/`). This will allow you to test. If something goes wrong, simply reboot.
+5. SSH into your TV. Copy this script to `/tmp/usb/sda/sda1/` and then execute. This will allow you to test. If the home screen on your TV is already open it will close and your last active task will be shown. If something goes wrong, simply reboot.
 6. If all goes well and ads are removed, copy the script to `/var/lib/webosbrew/init.d/`. The script will remove ads on boot.
 
 ## Further Notes
